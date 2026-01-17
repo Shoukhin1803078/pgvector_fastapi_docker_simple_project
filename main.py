@@ -7,11 +7,24 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy import text
 from pgvector.sqlalchemy import Vector
 from langchain_ollama import OllamaEmbeddings
+import os
 
 # ==================================================
 # DB CONFIG
 # ==================================================
-DATABASE_URL = "postgresql+psycopg2://ai:ai@db:5432/ai"
+# DATABASE_URL = "postgresql+psycopg2://ai:ai@db:5432/ai"
+
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+
+print(f"POSTGRES_DB==={POSTGRES_DB} POSTGRES_PASSWORD==={POSTGRES_PASSWORD} POSTGRES_USER==={POSTGRES_USER} POSTGRES_HOST==={POSTGRES_HOST} POSTGRES_PORT={POSTGRES_PORT}")
+
+
+DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
@@ -23,6 +36,7 @@ Base = declarative_base()
 embeddings = OllamaEmbeddings(
     model="nomic-embed-text",
     base_url="http://host.docker.internal:11434"
+    #  base_url="http://ollama:11434" # if ollama is install in docker pc
     )
 
 # ==================================================
