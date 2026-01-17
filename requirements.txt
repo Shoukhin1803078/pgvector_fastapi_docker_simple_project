@@ -1,0 +1,19 @@
+# fastapi
+# uvicorn
+# sqlalchemy>=2.0
+# psycopg2-binary
+# langchain
+# langchain-community
+# langchain-ollama
+# pgvector
+
+
+
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+langchain
+langchain-community
+pgvector
+langchain-ollama

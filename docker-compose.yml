@@ -1,0 +1,24 @@
+services:
+  db:
+    image: agnohq/pgvector:16
+    container_name: pgvector-db
+    environment:
+      POSTGRES_DB: ai
+      POSTGRES_USER: ai
+      POSTGRES_PASSWORD: ai
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai -d ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: fastapi-app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
