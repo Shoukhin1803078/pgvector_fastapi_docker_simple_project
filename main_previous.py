@@ -12,13 +12,19 @@ import os
 # ==================================================
 # DB CONFIG
 # ==================================================
+# DATABASE_URL = "postgresql+psycopg2://ai:ai@db:5432/ai"
+
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT")
 
+print(f"POSTGRES_DB==={POSTGRES_DB} POSTGRES_PASSWORD==={POSTGRES_PASSWORD} POSTGRES_USER==={POSTGRES_USER} POSTGRES_HOST==={POSTGRES_HOST} POSTGRES_PORT={POSTGRES_PORT}")
+
+
 DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
@@ -28,10 +34,10 @@ Base = declarative_base()
 # OLLAMA EMBEDDINGS
 # ==================================================
 embeddings = OllamaEmbeddings(
-    # model="nomic-embed-text",
-    model="bge-m3",
+    model="nomic-embed-text",
     base_url="http://host.docker.internal:11434"
-)
+    #  base_url="http://ollama:11434" # if ollama is install in docker pc
+    )
 
 # ==================================================
 # 1️⃣ NORMAL CRUD MODEL
@@ -44,20 +50,14 @@ class Item(Base):
     description = Column(Text)
 
 # ==================================================
-# 2️⃣ VECTOR MODEL (Job Recommendation)
+# 2️⃣ VECTOR MODEL
 # ==================================================
 class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True)
-    content = Column(Text)             
-    embedding = Column(Vector(1024))         # Dimension of the embedding model =   
-    title = Column(String(200))        
-    company = Column(String(100))      
-    location = Column(String(100))     
-    job_id_with_link = Column(String(300))   # 🔥 job_id + link
-    job_type = Column(String(50))      
-    salary = Column(String(50))        
+    content = Column(Text)
+    embedding = Column(Vector(768))
 
 # ==================================================
 # SCHEMAS
@@ -68,12 +68,6 @@ class ItemCreate(BaseModel):
 
 class DocCreate(BaseModel):
     content: str
-    title: str
-    company: str
-    location: str
-    job_id_with_link: str   # 🔥 new
-    job_type: str
-    salary: str
 
 class SearchQuery(BaseModel):
     query: str
@@ -81,7 +75,7 @@ class SearchQuery(BaseModel):
 # ==================================================
 # FASTAPI APP
 # ==================================================
-app = FastAPI(title="Job Recommendation + pgvector + Ollama")
+app = FastAPI(title="CRUD + pgvector + Ollama")
 
 # ==================================================
 # STARTUP
@@ -124,44 +118,25 @@ def delete_item(item_id: int):
     return {"message": "Item deleted ✅"}
 
 # ==================================================
-# 🔹 VECTOR DB ENDPOINTS (Job Recommendation)
+# 🔹 VECTOR DB ENDPOINTS
 # ==================================================
 @app.post("/vector/add")
 def add_document(doc: DocCreate):
     db = SessionLocal()
     vector = embeddings.embed_query(doc.content)
 
-    d = Document(
-        content=doc.content,
-        embedding=vector,
-        title=doc.title,
-        company=doc.company,
-        location=doc.location,
-        job_id_with_link=doc.job_id_with_link,
-        job_type=doc.job_type,
-        salary=doc.salary
-    )
+    d = Document(content=doc.content, embedding=vector)
     db.add(d)
     db.commit()
     db.refresh(d)
     db.close()
 
-    return {"id": d.id, "message": "Stored with embedding + metadata 🔥"}
+    return {"id": d.id, "message": "Stored with embedding 🔥"}
 
 @app.post("/vector/search")
 def search_document(payload: SearchQuery):
     db = SessionLocal()
-    print(f"user query==={payload.query}")
     q_vector = embeddings.embed_query(payload.query)
-    print(f"query embedding vector===={q_vector}")
-
-    #     # 🔥 metadata filtering
-    # if payload.category:
-    #     query = query.filter(Document.category == payload.category)
-
-    # if payload.source:
-    #     query = query.filter(Document.source == payload.source)
-        
 
     results = (
         db.query(
@@ -169,24 +144,17 @@ def search_document(payload: SearchQuery):
             Document.embedding.cosine_distance(q_vector).label("distance")
         )
         .order_by("distance")
-        .limit(3)  # top 5 jobs
+        .limit(3)
         .all()
     )
-    print(f"results========{results}")
 
     db.close()
 
     return [
         {
             "id": doc.id,
-            "title": doc.title,
-            "company": doc.company,
-            "location": doc.location,
-            "job_id_with_link": doc.job_id_with_link,  # 🔥 metadata
-            "job_type": doc.job_type,
-            "salary": doc.salary,
             "content": doc.content,
-            "similarity_score": float(distance)
+            "distance": float(distance)
         }
         for doc, distance in results
     ]
